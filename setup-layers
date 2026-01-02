@@ -44,8 +44,12 @@ def clone_repo(url, path, branch=None):
 
 
 def main():
-    script_dir = Path(__file__).parent
-    setup_json = script_dir / "setup-layers.json"
+    # meta-starry 本身就是这个脚本所在的目录
+    meta_starry_dir = Path(__file__).parent.resolve()
+    setup_json = meta_starry_dir / "setup-layers.json"
+    
+    # 父目录是工作目录，所有层都在这里
+    workspace_dir = meta_starry_dir.parent
 
     if not setup_json.exists():
         print(f"Error: {setup_json} not found")
@@ -56,6 +60,9 @@ def main():
 
     print("Setting up StarryOS Yocto layers...")
     print("=" * 50)
+    print(f"Workspace: {workspace_dir}")
+    print(f"meta-starry: {meta_starry_dir}")
+    print("")
 
     # Clone sources
     sources = config.get("sources", {})
@@ -67,8 +74,8 @@ def main():
         url = source_config["url"]
         branch = source_config.get("branch", "master")
 
-        # Clone to parent directory of meta-starry
-        clone_path = script_dir.parent / name
+        # Clone to workspace directory (parent of meta-starry)
+        clone_path = workspace_dir / name
 
         if not clone_repo(url, clone_path, branch):
             print(f"Failed to setup {name}")
@@ -77,13 +84,14 @@ def main():
     print("\nAll repositories cloned successfully!")
     print("\nNext steps:")
     print("1. Initialize build environment:")
-    print("   cd meta-starry")
-    print("   source ../poky/oe-init-build-env ../build")
+    print("   source poky/oe-init-build-env build")
     print("")
-    print("2. Build StarryOS:")
+    print("2. Add meta-starry and other layers to bblayers.conf")
+    print("")
+    print("3. Build StarryOS:")
     print("   bitbake starry")
     print("")
-    print("3. For more information, see README.md")
+    print("4. For more information, see meta-starry/README.md")
 
 
 if __name__ == "__main__":

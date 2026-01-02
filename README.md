@@ -21,28 +21,40 @@
 
 如果你是第一次在新的机器上部署本项目，只需执行以下步骤，脚本将自动根据 `setup-layers.json` 记录的版本，精准拉取所有依赖的层（如 poky, meta-openembedded等）。
 
-### 1. 克隆引导层
-首先，克隆本仓库到你的工作目录：
+### 1. 克隆 meta-starry 层
+首先，在你的工作目录中克隆本仓库：
 ```bash
-git clone https://kylin-x-kernel/meta-starry.git
-cd meta-starry
+mkdir -p ~/starry-workspace
+cd ~/starry-workspace
+git clone https://github.com/kylin-x-kernel/meta-starry.git
 ```
 
-### 2. 自动还原依赖层
-运行项目根目录下的 `setup-layers` 脚本。它会自动执行 `git clone` 和 `git checkout`，确保所有依赖层都处于正确的提交版本（Commit SHA）：
+### 2. 自动克隆依赖层
+运行 `meta-starry` 目录下的 `setup-layers` 脚本。它会自动在父目录克隆其他依赖层（poky、meta-openembedded 等）：
 ```bash
+cd meta-starry
 ./setup-layers
 ```
-*运行完成后，你会发现 `poky`、`meta-openembedded` 等目录已自动出现在你的工作目录中。*
+
+完成后的目录结构：
+```
+~/starry-workspace/
+  ├── meta-starry/          # 你的自定义层（Git 仓库）
+  ├── poky/                 # Yocto 核心（setup-layers 自动克隆）
+  └── meta-openembedded/    # OpenEmbedded 层（setup-layers 自动克隆）
+```
 
 ### 3. 初始化构建环境
-使用标准的 OpenEmbedded 脚本初始化环境：
+回到工作目录，使用标准的 OpenEmbedded 脚本初始化环境：
 ```bash
-# 注意：路径根据实际生成的 poky 目录位置确定
+cd ~/starry-workspace
 source poky/oe-init-build-env build
 ```
 
-### 4. 开始构建
+### 4. 配置层
+编辑 `build/conf/bblayers.conf`，添加 meta-starry 和其他需要的层。
+
+### 5. 开始构建
 ```bash
 bitbake starry
 ```
@@ -57,11 +69,12 @@ bitbake starry
 *   **操作**：直接使用标准的 Git 流程提交即可。
 *   **命令**：
     ```bash
+    cd ~/starry-workspace/meta-starry
     git add .
     git commit -m "Add new recipe for starry-service"
     git push
     ```
-*   **注意**：这种情况下 **不需要** 运行 `create-layers-setup`。因为 `setup-layers.json` 记录的是“去哪里克隆 `meta-starry`”，而不是它里面的具体内容。
+*   **注意**：这种情况下 **不需要** 更新 `setup-layers.json`，因为它只记录外部依赖层的信息。
 
 #### 2. 更新/增减外部依赖层（较少见）
 只有当你遇到了以下情况，才需要更新 `setup-layers` 相关的两个文件：
@@ -74,15 +87,15 @@ bitbake starry
 
 
 
-**替代方案**：
+**操作方案**：
 1. 手动更新本地各层的版本并确保编译通过。
-2. 编辑 `setup-layers.json` 文件，添加新的层信息。
-3. 编辑 `setup-layers` 脚本，更新克隆逻辑（如需要）。
+2. 编辑 `meta-starry/setup-layers.json` 文件，添加新的层信息。
+3. 如需要，编辑 `meta-starry/setup-layers` 脚本，更新克隆逻辑。
 4. 提交更新后的文件：
     ```bash
-    cd meta-starry
+    cd ~/starry-workspace/meta-starry
     git add setup-layers.json setup-layers
-    git commit -m "add new layer meta-raspberrypi"
+    git commit -m "Add new layer meta-raspberrypi"
     git push
     ```
 

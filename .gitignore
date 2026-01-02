@@ -1,0 +1,28 @@
+# Yocto 构建目录
+build/
+tmp/
+sstate-cache/
+downloads/
+
+# 外部层仓库（由 setup-layers 克隆）
+poky/
+meta-openembedded/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
