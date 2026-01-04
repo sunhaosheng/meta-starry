@@ -1,55 +1,60 @@
+# StarryOS Yocto 构建本地配置模板
 #
-# StarryOS Bare-Metal Kernel Build Configuration
+# 使用方法:
+#   1. source poky/oe-init-build-env build
+#   2. 将此文件复制到 build/conf/local.conf
+#   或者设置 TEMPLATECONF 指向 meta-starry/conf
 
+# ==================== 机器选择 ====================
+# 可选值:
+#   aarch64-qemu-virt      - ARM64 QEMU (默认)
+#   riscv64-qemu-virt      - RISC-V 64 QEMU
+#   loongarch64-qemu-virt  - LoongArch64 QEMU
+#   x86_64-qemu-q35        - x86_64 QEMU
+MACHINE = "aarch64-qemu-virt"
+
+# ==================== 发行版 ====================
+DISTRO = "starryos"
+
+# ==================== Rust 工具链 ====================
+# 默认使用 rustup 预编译的 nightly 工具链（通过 rust-prebuilt-native）
+# 要求：系统已安装 rustup 和 nightly 工具链
+# 
+# 安装方法：
+#   rustup toolchain install nightly
+#   rustup target add aarch64-unknown-none-softfloat --toolchain nightly
+#   rustup target add riscv64gc-unknown-none-elf --toolchain nightly
+#   rustup target add loongarch64-unknown-none-softfloat --toolchain nightly
+#   rustup target add x86_64-unknown-none --toolchain nightly
 #
+# 注意：必须使用 nightly，因为 StarryOS 需要 unstable features
 
-# ==================== Machine Selection ====================
-# 目标平台选择
-MACHINE ??= "aarch64-qemu-virt"
+# ==================== ArceOS 构建参数 ====================
+# 取消注释以覆盖默认值
 
-# ==================== Build System Configuration ====================
-# 发行版配置
-DISTRO ?= "starryos"
+# CPU 核心数 (默认: 4)
+#ARCEOS_SMP = "8"
 
-# 下载目录
-#DL_DIR ?= "${TOPDIR}/downloads"
+# 日志级别: off/error/warn/info/debug/trace (默认: warn)
+#ARCEOS_LOG = "debug"
 
-# 共享状态缓存目录
-#SSTATE_DIR ?= "${TOPDIR}/sstate-cache"
+# 内存大小 (默认: 由平台配置决定)
+#ARCEOS_MEM = "2G"
 
-# 临时构建目录
-#TMPDIR = "${TOPDIR}/tmp"
+# 调试信息: y/n (默认: y)
+#ARCEOS_DWARF = "y"
 
-# ==================== Bare-Metal Specific Settings ====================
-# C 库设置为 baremetal（由 machine 配置文件设置，这里不重复）
-# TCLIBC 已在 meta-starry/conf/machine/*.conf 中设置
+# ==================== 并行构建 ====================
+# 根据你的 CPU 核心数调整
+BB_NUMBER_THREADS = "30"
+PARALLEL_MAKE = "-j 30"
 
+# ==================== 下载与缓存目录 ====================
+# 可选：使用共享目录加速多次构建
+#DL_DIR = "${TOPDIR}/../downloads"
+#SSTATE_DIR = "${TOPDIR}/../sstate-cache"
 
-
-# 禁用 BitBake 网络隔离
-BB_NO_NETWORK = "0"
-
-# 完全禁用网络隔离功能（避免 Operation not permitted 错误）
-BB_TASK_NETWORK = "1"
-
-# ==================== Package Management ====================
-# 裸机内核不需要打包系统
-# PACKAGE_CLASSES 已在 distro 配置中设置
-# INHIBIT_PACKAGE_INSTALL 已在 distro 配置中设置
-
-# ==================== Build Performance ====================
-# 构建统计
-USER_CLASSES ?= "buildstats"
-
-# 并行构建配置，这里上限为自己本地的nproc
-BB_NUMBER_THREADS = "26"
-PARALLEL_MAKE = "-j 26"
-
-# ==================== Interactive Configuration ====================
-# 补丁解决策略（非交互式）
-PATCHRESOLVE = "noop"
-
-# ==================== Disk Space Monitoring ====================
+# ==================== 磁盘空间监控 ====================
 BB_DISKMON_DIRS ??= "\
     STOPTASKS,${TMPDIR},1G,100K \
     STOPTASKS,${DL_DIR},1G,100K \
@@ -60,11 +65,9 @@ BB_DISKMON_DIRS ??= "\
     HALT,${SSTATE_DIR},100M,1K \
     HALT,/tmp,10M,1K"
 
-# ==================== QEMU Configuration ====================
-# QEMU SDL 支持（用于测试运行）
-PACKAGECONFIG:append:pn-qemu-system-native = " sdl"
+# ==================== 构建选项 ====================
+# 禁用交互式补丁解决
+PATCHRESOLVE = "noop"
 
-
-
-# ==================== Build Configuration Version ====================
+# 版本标识
 CONF_VERSION = "2"

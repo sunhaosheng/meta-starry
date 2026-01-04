@@ -1,201 +1,451 @@
 # meta-starry
 
-这是Yocto 项目层 **meta-starry**。
+**StarryOS Yocto 构建系统** - 使用 BitBake 完全复刻 StarryOS 的 Makefile 构建逻辑
 
-本仓库不仅包含了自定义的 Recipe 和配置，还作为整个项目的“引导仓库（Bootstrap Layer）”，通过 Yocto 官方的 `setup-layers` 机制，实现了一键复现完整的开发环境。
-**当前阶段：** Bare-Metal Kernel（Phase 1）  
-**未来规划：** [Linux Userspace 支持路线图](docs/USERSPACE-ROADMAP.md)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Yocto](https://img.shields.io/badge/yocto-kirkstone-green.svg)](https://www.yoctoproject.org/)
+[![Rust](https://img.shields.io/badge/rust-nightly--1.94.0-orange.svg)](https://www.rust-lang.org/)
 
 ---
 
-## 📖 快速导航
+##  项目简介
 
-- [一键复现环境](#-快速开始一键复现环境)
-- [构建说明](#-项目构建内容)
-- [Rust 开发指南](recipes-devtools/rust/README-rust.md)
-- [Linux Userspace 路线图](docs/USERSPACE-ROADMAP.md)
-- [提交代码规范](#️-维护与更新规范)
+`meta-starry` 是 StarryOS 的 Yocto Project 构建层，实现了starry内核的构建过程。
+
+### 设计原则
+
+-  **复刻 Makefile 逻辑**：完全保持与原始 Makefile 构建的一致性
+-  **预编译工具链**：使用 Rust nightly 预编译工具链，构建速度快
+-  **Bare-Metal First**：仅裸机内核，暂不包含用户态
+
+### 与 Makefile 的对应关系
+
+| Makefile 组件 | Yocto 对应 | 说明 |
+|--------------|-----------|------|
+| `StarryOS/Makefile` | `starry_git.bb` | 内核主配方 |
+| `arceos/Makefile` | `arceos.bbclass` | ArceOS 构建逻辑 |
+| `scripts/make/features.mk` | `arceos-features.bbclass` | Cargo 特性解析 |
+| `scripts/make/config.mk` | `arceos_generate_config()` | 平台配置生成 |
+| `scripts/make/platform.mk` | Machine 配置文件 | 平台变量设置 |
+
 ---
 
-## 🚀 快速开始：一键复现环境
+## 快速开始
 
-如果你是第一次在新的机器上部署本项目，只需执行以下步骤，脚本将自动根据 `setup-layers.json` 记录的版本，精准拉取所有依赖的层（如 poky, meta-openembedded等）。
+### 环境要求
 
-### 1. 克隆 meta-starry 层
-首先，在你的工作目录中克隆本仓库：
+- Ubuntu 24.04 或兼容系统
+- Python 3.8+
+- Git
+- 基础构建工具（gcc, make 等）
+
+### 1. 克隆仓库
+
 ```bash
 mkdir -p ~/starry-workspace
 cd ~/starry-workspace
 git clone https://github.com/kylin-x-kernel/meta-starry.git
 ```
 
-### 2. 自动克隆依赖层
-运行 `meta-starry` 目录下的 `setup-layers` 脚本。它会自动在父目录克隆其他依赖层（poky、meta-openembedded 等）：
+### 2. 自动设置依赖层
+
 ```bash
 cd meta-starry
 ./setup-layers
 ```
 
-完成后的目录结构：
+这会自动克隆所有依赖的 Yocto 层：
 ```
 ~/starry-workspace/
-  ├── meta-starry/          # 你的自定义层（Git 仓库）
-  ├── poky/                 # Yocto 核心（setup-layers 自动克隆）
-  └── meta-openembedded/    # OpenEmbedded 层（setup-layers 自动克隆）
+  ├── meta-starry/          # 本项目
+  ├── poky/                 # Yocto 核心
+  └── meta-openembedded/    # OpenEmbedded 扩展
 ```
 
 ### 3. 初始化构建环境
-回到工作目录，使用标准的 OpenEmbedded 脚本初始化环境：
+
 ```bash
 cd ~/starry-workspace
 source poky/oe-init-build-env build
 ```
 
-### 4. 配置层
-编辑 `build/conf/bblayers.conf`，添加 meta-starry 和其他需要的层。
+首次初始化会自动复制 `meta-starry` 的示例配置：
+- `conf/local.conf.sample` → `build/conf/local.conf`
+- `conf/bblayers.conf.sample` → `build/conf/bblayers.conf`
 
-### 5. 开始构建
-```bash
+### 4. 构建 StarryOS 内核
+
+# 构建内核
 bitbake starry
 ```
----
 
-### 🛠️ 维护与更新规范
+### 5. 构建产物
 
-在使用本仓库进行协作开发时，请遵循以下原则来区分 **代码修改** 与 **环境快照更新**：
-
-#### 1. 修改 `meta-starry` 内部代码（最常见）
-如果你只是在 `meta-starry` 中添加、删除或修改了 Recipe、配置文件（如 `.bb`, `.bbappend`, `layer.conf`）：
-*   **操作**：直接使用标准的 Git 流程提交即可。
-*   **命令**：
-    ```bash
-    cd ~/starry-workspace/meta-starry
-    git add .
-    git commit -m "Add new recipe for starry-service"
-    git push
-    ```
-*   **注意**：这种情况下 **不需要** 更新 `setup-layers.json`，因为它只记录外部依赖层的信息。
-
-#### 2. 更新/增减外部依赖层（较少见）
-只有当你遇到了以下情况，才需要更新 `setup-layers` 相关的两个文件：
-*   **情况 A**：你想升级 `poky` 或 `meta-openembedded` 的版本（指向了新的 Commit ID）。
-*   **情况 B**：你给项目引入了一个全新的层，也就是手动新建立了某一个层，比如你想为某个开发版实现适配，建立了meta-raspberrypi层，你在里面添加了你的各种配置和依赖，并希望将这些更改保存到“一键复现”清单中。
-
-**操作流程**：
-
-#### 针对 Yocto Kirkstone (BitBake 2.0.0)
-
-
-
-**操作方案**：
-1. 手动更新本地各层的版本并确保编译通过。
-2. 编辑 `meta-starry/setup-layers.json` 文件，添加新的层信息。
-3. 如需要，编辑 `meta-starry/setup-layers` 脚本，更新克隆逻辑。
-4. 提交更新后的文件：
-    ```bash
-    cd ~/starry-workspace/meta-starry
-    git add setup-layers.json setup-layers
-    git commit -m "Add new layer meta-raspberrypi"
-    git push
-    ```
-
-#### 手动创建 setup-layers.json 示例
-
-如果需要添加新层，请编辑 `setup-layers.json`：
-
-```json
-{
-    "sources": {
-        "meta-raspberrypi": {
-            "url": "https://github.com/agherzan/meta-raspberrypi.git",
-            "branch": "master"
-        }
-    },
-    "layers": {
-        "meta-raspberrypi": {
-            "source": "meta-raspberrypi",
-            "path": "."
-        }
-    }
-}
+构建成功后，产物位于：
+```
+build/tmp-baremetal/deploy/images/aarch64-qemu-virt/
+  ├── starry.elf  (86MB) - 包含 DWARF 调试信息的 ELF
+  └── starry.bin  (38MB) - 二进制镜像
 ```
 
-#### 总结表格
-| 修改内容 | 是否需要更新 `setup-layers`？ | 提交方式 |
-| :--- | :--- | :--- |
-| 修改 `meta-starry` 里的 Recipe | **不需要** | 直接 `git commit` |
-| 修改 `meta-starry` 的配置文件 | **不需要** | 直接 `git commit` |
-| 升级 `poky` 或其他外部层版本 | **需要** | 先生成快照，再 `git commit` |
-| 添加了一个新的外部层 | **需要** | 先生成快照，再 `git commit` |
+---
+
+##  架构设计
+
+### 核心分层架构
+
+```
+┌─────────────────────────────────────────────────┐
+│              starry_git.bb                      │  内核配方层
+│          (StarryOS 主配方)                      │
+├─────────────────────────────────────────────────┤
+│          arceos-features.bbclass                │  特性解析层
+│     (Cargo features 自动生成)                   │
+├─────────────────────────────────────────────────┤
+│            arceos.bbclass                       │  ArceOS 集成层
+│  (平台配置、环境变量、musl 适配)                │
+├─────────────────────────────────────────────────┤
+│          rust-kernel.bbclass                    │  Rust 内核通用层
+│    (工具链配置、Cargo 环境)                     │
+├─────────────────────────────────────────────────┤
+│        rust-prebuilt-native                     │  工具链层
+│  (nightly 1.94.0 + LLVM tools)                  │
+└─────────────────────────────────────────────────┘
+```
+
+### 目录结构
+
+```
+meta-starry/
+├── classes/                          # 构建类
+│   ├── rust-kernel.bbclass          # Rust 内核通用构建
+│   ├── arceos.bbclass                # ArceOS 特定逻辑
+│   └── arceos-features.bbclass       # Cargo 特性解析
+│
+├── conf/                             # 配置文件
+│   ├── layer.conf                    # 层配置
+│   ├── templateconf.cfg              # 模板配置标记
+│   ├── local.conf.sample             # 本地配置模板
+│   ├── bblayers.conf.sample          # 层配置模板
+│   ├── distro/
+│   │   ├── starryos.conf             # 发行版配置
+│   │   └── include/
+│   │       ├── arceos-defaults.inc   # ArceOS 默认值
+│   │       └── tclibc-none.inc       # Bare-metal C 库
+│   └── machine/                      # 机器配置
+│       ├── aarch64-qemu-virt.conf
+│       ├── riscv64-qemu-virt.conf
+│       ├── loongarch64-qemu-virt.conf
+│       └── x86_64-qemu-q35.conf
+│
+├── recipes-devtools/                 # 开发工具
+│   ├── rust/
+│   │   └── rust-prebuilt-native_1.94.0.bb  # 预编译工具链
+│   ├── axconfig-gen/                 # 平台配置生成器
+│   ├── cargo-binutils/               # Rust 二进制工具
+│   └── flex/                         # Flex 依赖修复
+│
+├── recipes-kernel/                   # 内核配方
+│   └── starryos/
+│       ├── starry_git.bb             # StarryOS 主配方
+│       └── starry-targets.inc        # 多目标配置
+│
+├── files/                            # 辅助文件
+│   └── musl-headers/                 # musl 头文件（lwext4 使用）
+│
+├── docs/                             # 文档
+│   
+│
+├── setup-layers                      # 环境设置脚本
+├── setup-layers.json                 # 依赖层配置
+└── README.md                         # 本文件
+```
+
+---
+
+##  核心组件说明
+
+### 1. Rust 工具链
+
+**配方**: `recipes-devtools/rust/rust-prebuilt-native_1.94.0.bb`
+
+- **版本**: Rust nightly 1.94.0 (2026-01-02)
+- **来源**: Rust 官方预编译二进制
+- **包含**:
+  - `rustc` - Rust 编译器
+  - `cargo` - 包管理器
+  - LLVM 工具链（rust-objcopy, rust-objdump 等）
+  - 4 个架构的 bare-metal std 库：
+    - `aarch64-unknown-none-softfloat`
+    - `riscv64gc-unknown-none-elf`
+    - `loongarch64-unknown-none-softfloat`
+    - `x86_64-unknown-none`
+
+**优势**:
+- ⚡ 快速：无需从源码编译（节省 1+ 小时）
+-  稳定：版本锁定，构建可重现
+-  完整：包含所有必需的工具和库
+
+### 2. 构建类（Classes）
+
+#### `rust-kernel.bbclass` - Rust 内核通用构建层
+
+**职责**:
+- 配置 Rust 工具链路径
+- 设置 `RUSTC_BOOTSTRAP=1`
+- 配置 Cargo 环境（`.cargo/config.toml`）
+- 提供默认的 `do_configure`, `do_compile`, `do_install`
+
+**变量**:
+- `RUST_TARGET` - Rust 目标三元组
+- `KERNEL_ARCH` - 内核架构
+
+#### `arceos.bbclass` - ArceOS 集成层
+
+**职责**:
+- 生成 `.axconfig.toml` 平台配置文件
+- 导出 ArceOS 环境变量
+- 配置 musl 工具链 wrapper（lwext4_rust 需要）
+- 设置 RUSTFLAGS（链接器脚本、DWARF 等）
+
+**核心函数**:
+- `arceos_generate_config()` - 生成平台配置
+- `arceos_setup_musl_wrapper()` - musl 工具链适配
+
+#### `arceos-features.bbclass` - Cargo 特性解析层
+
+**职责**:
+- 复刻 `features.mk` 逻辑
+- 自动生成 `CARGO_FEATURES` 变量
+- 支持 `defplat`/`myplat`, `dwarf`, `smp` 等特性
+
+**输入变量**:
+- `ARCEOS_PLAT_PACKAGE` - 平台包名
+- `ARCEOS_SMP` - CPU 核心数
+- `ARCEOS_DWARF` - 调试符号
+- `ARCEOS_FEATURES` - 额外特性
+
+**输出**:
+- `CARGO_FEATURES` - 完整的 Cargo features 字符串
+
+### 3. 内核配方
+
+**配方**: `recipes-kernel/starryos/starry_git.bb`
+
+**关键设置**:
+```python
+# Git 源
+SRC_URI = "git://github.com/kylin-x-kernel/StarryOS.git;protocol=https;branch=main"
+
+# 继承构建类
+inherit arceos-features arceos deploy
+
+# ArceOS 配置
+ARCEOS_NO_AXSTD = "y"
+ARCEOS_AX_LIB = "axfeat"
+ARCEOS_DWARF = "y"
+ARCEOS_SMP = "4"
+```
+
+**构建流程**:
+1. `do_configure` - 生成 `.axconfig.toml`
+2. `do_compile` - 执行 `cargo build --features "..."`
+3. `do_install` - 安装 ELF + 生成二进制镜像
+4. `do_deploy` - 部署到 deploy 目录
+
+---
+
+##  配置说明
+
+### Machine 配置
+
+每个架构都有独立的 machine 配置文件，对应 Makefile 的 `ARCH` 变量。
+
+**示例**: `conf/machine/aarch64-qemu-virt.conf`
+```python
+# 架构设置
+require conf/machine/include/arceos-machine-common.inc
+require conf/machine/include/arm/arch-armv8a.inc
+
+# ArceOS 变量（对应 Makefile）
+ARCEOS_ARCH = "aarch64"
+ARCEOS_PLATFORM = "aarch64-qemu-virt"
+ARCEOS_PLAT_PACKAGE = "axplat-aarch64-qemu-virt"
+RUST_TARGET = "aarch64-unknown-none-softfloat"
+
+# SMP 配置
+ARCEOS_SMP ?= "4"
+```
+
+### 本地配置
+
+**文件**: `conf/local.conf.sample`
+
+**关键设置**:
+```python
+# 机器和发行版
+MACHINE = "aarch64-qemu-virt"
+DISTRO = "starryos"
+
+# 并行构建
+BB_NUMBER_THREADS = "30"
+PARALLEL_MAKE = "-j 30"
+
+# 可选覆盖
+ARCEOS_SMP ?= "4"
+ARCEOS_LOG ?= "info"
+ARCEOS_MEM ?= "1G"
+```
+
+---
+
+##  构建目标
+
+### 基本目标
+
+```bash
+# 构建内核
+bitbake starry
+
+# 清理构建
+bitbake starry -c cleansstate
+
+# 仅编译
+bitbake starry -c compile
+
+# 查看任务列表
+bitbake starry -c listtasks
+```
+
+### 多架构构建
+
+```bash
+# ARM64
+MACHINE=aarch64-qemu-virt bitbake starry
+
+# RISC-V 64
+MACHINE=riscv64-qemu-virt bitbake starry
+
+# LoongArch 64
+MACHINE=loongarch64-qemu-virt bitbake starry
+
+# x86_64
+MACHINE=x86_64-qemu-q35 bitbake starry
+```
+
+### 自定义构建
+
+```bash
+# 单核构建
+echo 'ARCEOS_SMP = "1"' >> conf/local.conf
+bitbake starry
+
+# 修改日志级别
+echo 'ARCEOS_LOG = "debug"' >> conf/local.conf
+bitbake starry
+
+# 调整内存大小
+echo 'ARCEOS_MEM = "2G"' >> conf/local.conf
+bitbake starry
+```
+
+---
+
+##  开发指南
+
+### 添加新的平台
+
+1. 创建 machine 配置：`conf/machine/your-platform.conf`
+2. 设置 `ARCEOS_PLATFORM` 和 `RUST_TARGET`
+3. 构建：`MACHINE=your-platform bitbake starry`
+
+### 修改构建逻辑
+
+- **通用 Rust 内核逻辑** → 修改 `classes/rust-kernel.bbclass`
+- **ArceOS 特定逻辑** → 修改 `classes/arceos.bbclass`
+- **特性解析逻辑** → 修改 `classes/arceos-features.bbclass`
+
+### 调试构建
+
+```bash
+# 查看构建日志
+bitbake starry -c compile
+less tmp-baremetal/work/*/starry/*/temp/log.do_compile
+
+# 查看 Cargo features
+bitbake starry -e | grep ^CARGO_FEATURES=
+
+# 查看环境变量
+bitbake starry -e | grep ^ARCEOS_
+```
+
+---
+
+##  文档索引
+
 
 
 ---
 
-##  项目构建内容
+##  贡献指南
 
-**meta-starry 当前专注于裸机操作系统内核的构建，暂时不包含用户态应用程序。**
+### 提交代码修改
 
-### Rust 工具链架构
+```bash
+cd ~/starry-workspace/meta-starry
+git add .
+git commit -m "feat: add new feature"
+git push
+```
 
-本项目提供**完全从源码构建**的 Rust 工具链，包括：
-- **rust-native**: rustc 1.92.0 编译器 + cargo 包管理器（源码构建）
-- **rust-std-{arch}-none-native**: 裸机目标标准库（core + alloc + compiler_builtins）
-  - 支持架构：aarch64, riscv64, loongarch64, x86_64
-  - 构建方式：直接编译 library/core，自动包含 alloc 和 compiler_builtins
+### 更新依赖层
 
-### 构建系统类（bbclass）
+只有在升级 Yocto 版本或添加新的外部层时才需要：
 
-**rust-kernel.bbclass** - 通用 Rust 裸机内核构建基础类
-- 自动配置 Rust 工具链（rust-native + rust-std）
-- 自动链接 std 库到 sysroot
-- Cargo 环境设置
-- 默认 do_configure/do_compile/do_install 任务
+```bash
+# 编辑 setup-layers.json
+vim setup-layers.json
 
-**arceos.bbclass** - ArceOS 特定构建类（继承 rust-kernel.bbclass）
-- ArceOS 平台配置生成（axconfig-gen）
-- StarryOS 支持（自动检测 arceos submodule）
-- lwext4_rust 的 C 代码编译支持
-- ArceOS features 和环境变量管理
+# 提交更新
+git add setup-layers.json setup-layers
+git commit -m "chore: update poky to new version"
+git push
+```
 
-详细说明：
-- [Rust 工具链开发指南](recipes-devtools/rust/README-rust.md)
-- [快速参考：类与工具链](docs/QUICK-REFERENCE.md)
+---
 
-### 构建产物
-*   **StarryOS 内核**：基于 Rust 的裸机操作系统内核（`#![no_std]`）
-    *   目标架构：aarch64, riscv64, loongarch64, x86_64
-    *   使用裸机 Rust 标准库（如 `rust-std-aarch64-none-native`）
-  
+##  项目状态
 
-### 当前配方分类
-1.  **内核构建**（`recipes-kernel/`）
-    *   `starryos/`：StarryOS 裸机内核
-    *   `linux-libc-headers/`：Linux 头文件（供 C 库编译时使用，如 lwext4）
+### 当前阶段
+✅ **Phase 1: Bare-Metal Kernel** (已完成)
+- StarryOS 内核构建
+- 多架构支持（aarch64, riscv64, loongarch64, x86_64）
+- DWARF 调试支持
+-  Makefile 构建逻辑
 
-2.  **Rust 工具链**（`recipes-devtools/rust/`）
-    *   `rustc-bin`, `cargo-bin`：预编译的 Rust 1.92.0 工具链
-    *   `rust-std-*-none-native`：裸机目标标准库
-    *   `libstd-rs`：Linux 用户态标准库（**当前未使用**，为将来扩展保留）
-
-3.  **构建辅助工具**（`recipes-devtools/`）
-    *   `axconfig-gen`：ArceOS 配置生成器
-    *   `cargo-axplat`：平台配置工具
-    *   `cargo-binutils`：Rust 二进制工具（objdump, nm 等）
-
+### 未来规划
+ **Phase 2: Linux Userspace** (规划中)
+- 用户态应用支持
+- 完整的系统镜像
+- 根文件系统
 
 
 
 ---
 
-##  目录结构说明
+##  致谢
 
-*   `conf/`: 包含层配置文件 `layer.conf`。
-*   `recipes-kernel/`: 内核相关配方（StarryOS、Linux 头文件）。
-*   `recipes-devtools/`: 开发工具（Rust 工具链、构建辅助工具）。
-*   `recipes-connectivity/`, `recipes-support/`: 预留目录（当前为空）。
-*   `setup-layers.json`: **核心文件**，记录了所有依赖层的仓库地址、分支及精确的 Commit ID。
-*   `setup-layers`: 用于还原环境的 Python 脚本。
+- [Yocto Project](https://www.yoctoproject.org/)
+- [StarryOS](https://github.com/Starry-OS/StarryOS)
+- [ArceOS](https://github.com/arceos-org/arceos)
 
 ---
 
-## 📜 许可
+## 📜 许可证
+
+MIT License
+
+---
+
+**维护者**: @kylin-x-kernel  @yeanwang666   @guoweikang
+**最后更新**: 2026-01-03

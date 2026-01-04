@@ -21,7 +21,6 @@
 # Optional variables:
 #   CARGO_FEATURES - Cargo features to enable
 #   EXTRA_CARGO_FLAGS - Additional cargo flags
-
 # ==================== Dependencies ====================
 DEPENDS:append = " rust-native"
 
@@ -29,6 +28,12 @@ CLEANBROKEN = "1"
 
 # Dynamically add rust-std for target architecture
 python __anonymous() {
+    rust_provider = d.getVar('PREFERRED_PROVIDER_rust-native')
+    
+    if rust_provider == 'rust-prebuilt-native':
+        bb.note("Using rust-prebuilt-native (includes all target std libs)")
+        return
+    
     arch = d.getVar('KERNEL_ARCH')
     if not arch:
         arch = d.getVar('TARGET_ARCH')
@@ -72,47 +77,89 @@ export RUST_TARGET_TRIPLE = "${RUST_TARGET}"
 # This MUST be at metadata level for BitBake to properly export to child processes
 export RUSTC_BOOTSTRAP = "1"
 
-# CRITICAL: Path to target specs (including x86_64-linux.json for host builds)
-# This is where Yocto's rust-native installs target specifications
-export RUST_TARGET_PATH = "${COMPONENTS_DIR}/${BUILD_ARCH}/rust-native/usr/lib/rustlib"
-
 # Rust native toolchain paths
-RUST_NATIVE = "${COMPONENTS_DIR}/${BUILD_ARCH}/rust-native"
+# 支持 rust-native (从源码构建) 和 rust-prebuilt-native (预编译)
+# rust-prebuilt-native 优先
+python () {
+    components_dir = d.getVar('COMPONENTS_DIR')
+    build_arch = d.getVar('BUILD_ARCH')
+    
+    # 优先使用 rust-prebuilt-native
+    prebuilt_path = os.path.join(components_dir, build_arch, 'rust-prebuilt-native')
+    source_path = os.path.join(components_dir, build_arch, 'rust-native')
+    
+    if os.path.exists(os.path.join(prebuilt_path, 'usr', 'bin', 'rustc')):
+        d.setVar('RUST_NATIVE', prebuilt_path)
+    else:
+        d.setVar('RUST_NATIVE', source_path)
+}
+RUST_NATIVE ?= "${COMPONENTS_DIR}/${BUILD_ARCH}/rust-prebuilt-native"
 export PATH:prepend = "${RUST_NATIVE}/usr/bin:"
+export RUST_TARGET_PATH = "${RUST_NATIVE}/usr/lib/rustlib"
 
 # ==================== Toolchain Setup ====================
 # Minimal setup: only verify and link std library
 # NO wrapper scripts, NO environment overrides
 rust_kernel_setup_toolchain() {
-    local rust_native="${COMPONENTS_DIR}/${BUILD_ARCH}/rust-native"
+    # 查找可用的 rust 工具链 (优先 rust-prebuilt-native)
+    local rust_prebuilt="${COMPONENTS_DIR}/${BUILD_ARCH}/rust-prebuilt-native"
+    local rust_source="${COMPONENTS_DIR}/${BUILD_ARCH}/rust-native"
+    local rust_native=""
+    
+    if [ -x "${rust_prebuilt}/usr/bin/rustc" ]; then
+        rust_native="${rust_prebuilt}"
+        bbnote "Using rust-prebuilt-native"
+    elif [ -x "${rust_source}/usr/bin/rustc" ]; then
+        rust_native="${rust_source}"
+        bbnote "Using rust-native (built from source)"
+    else
+        bbfatal "No Rust toolchain found. Checked:\n  ${rust_prebuilt}\n  ${rust_source}"
+    fi
+    
+    # 导出工具链路径
+    export PATH="${rust_native}/usr/bin:${PATH}"
+    export RUST_TARGET_PATH="${rust_native}/usr/lib/rustlib"
     
     # Verify toolchain
     if [ ! -x "${rust_native}/usr/bin/cargo" ]; then
-        bbfatal "cargo not found in rust-native"
+        bbfatal "cargo not found in rust-native at ${rust_native}/usr/bin/"
     fi
     if [ ! -x "${rust_native}/usr/bin/rustc" ]; then
-        bbfatal "rustc not found in rust-native"
+        bbfatal "rustc not found in rust-native at ${rust_native}/usr/bin/"
     fi
     
-    # Link target std library into rust-native sysroot
-    local target_rustlib="${rust_native}/usr/lib/rustlib/${RUST_TARGET}"
-    local kernel_arch="${KERNEL_ARCH:-${TARGET_ARCH}}"
-    local std_src="${COMPONENTS_DIR}/${BUILD_ARCH}/rust-std-${kernel_arch}-none-native/usr/lib/rustlib/${RUST_TARGET}"
-    
-    if [ ! -d "${target_rustlib}" ]; then
-        if [ ! -d "${std_src}" ]; then
-            bbfatal "Target ${RUST_TARGET} std library not found at ${std_src}"
+    # 检查是否是 rust-prebuilt-native (所有目标库已包含)
+    if [ "${rust_native}" = "${rust_prebuilt}" ]; then
+        # rust-prebuilt-native: 所有 target 库已在正确位置
+        bbnote "All target libraries included in prebuilt toolchain"
+    else
+        # 从源码编译的 rust-native: 需要链接 rust-std
+        local target_rustlib="${rust_native}/usr/lib/rustlib/${RUST_TARGET}"
+        local kernel_arch="${KERNEL_ARCH:-${TARGET_ARCH}}"
+        local std_src="${COMPONENTS_DIR}/${BUILD_ARCH}/rust-std-${kernel_arch}-none-native/usr/lib/rustlib/${RUST_TARGET}"
+        
+        if [ ! -d "${target_rustlib}" ]; then
+            if [ ! -d "${std_src}" ]; then
+                bbfatal "Target ${RUST_TARGET} std library not found at ${std_src}"
+            fi
+            bbnote "Linking ${RUST_TARGET} std library into rust-native sysroot"
+            ln -sf "${std_src}" "${target_rustlib}"
         fi
-        bbnote "Linking ${RUST_TARGET} std library into rust-native sysroot"
-        ln -sf "${std_src}" "${target_rustlib}"
+        
+        bbnote "Using rust-native (built from source)"
     fi
     
-    # Verify std library
+    # Verify target std library
+    local target_rustlib="${rust_native}/usr/lib/rustlib/${RUST_TARGET}"
+    if [ ! -d "${target_rustlib}/lib" ]; then
+        bbfatal "Target ${RUST_TARGET} library directory not found: ${target_rustlib}/lib"
+    fi
+    
     if [ ! -f "${target_rustlib}/lib/libcore.rlib" ] && ! ls "${target_rustlib}/lib/libcore-"*.rlib >/dev/null 2>&1; then
-        bbfatal "libcore not found in ${target_rustlib}/lib/"
+        bbfatal "libcore not found for target ${RUST_TARGET} in ${target_rustlib}/lib/"
     fi
     
-    # Log configuration (no changes to environment!)
+    # Log configuration
     bbnote "Rust toolchain configured:"
     bbnote "  RUSTC_BOOTSTRAP=${RUSTC_BOOTSTRAP}"
     bbnote "  RUST_TARGET_PATH=${RUST_TARGET_PATH}"
