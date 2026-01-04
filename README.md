@@ -21,7 +21,7 @@
 ### 与 Makefile 的对应关系
 
 | Makefile 组件 | Yocto 对应 | 说明 |
-|--------------|-----------|------|
+|:--------------|:-----------|:------|
 | `StarryOS/Makefile` | `starry_git.bb` | 内核主配方 |
 | `arceos/Makefile` | `arceos.bbclass` | ArceOS 构建逻辑 |
 | `scripts/make/features.mk` | `arceos-features.bbclass` | Cargo 特性解析 |
@@ -75,6 +75,7 @@ source poky/oe-init-build-env build
 
 ### 4. 构建 StarryOS 内核
 
+```bash
 # 构建内核
 bitbake starry
 ```
@@ -94,24 +95,27 @@ build/tmp-baremetal/deploy/images/aarch64-qemu-virt/
 
 ### 核心分层架构
 
-```
-┌─────────────────────────────────────────────────┐
-│              starry_git.bb                      │  内核配方层
-│          (StarryOS 主配方)                      │
-├─────────────────────────────────────────────────┤
-│          arceos-features.bbclass                │  特性解析层
-│     (Cargo features 自动生成)                   │
-├─────────────────────────────────────────────────┤
-│            arceos.bbclass                       │  ArceOS 集成层
-│  (平台配置、环境变量、musl 适配)                │
-├─────────────────────────────────────────────────┤
-│          rust-kernel.bbclass                    │  Rust 内核通用层
-│    (工具链配置、Cargo 环境)                     │
-├─────────────────────────────────────────────────┤
-│        rust-prebuilt-native                     │  工具链层
-│  (nightly 1.94.0 + LLVM tools)                  │
-└─────────────────────────────────────────────────┘
-```
+系统采用分层设计，从底层到顶层依次为：
+
+1. **工具链层** - `rust-prebuilt-native`
+   - Rust nightly 1.94.0 + LLVM tools
+   - 提供编译器和二进制工具
+
+2. **Rust 内核通用层** - `rust-kernel.bbclass`
+   - 工具链配置、Cargo 环境
+   - 通用 Rust 内核构建逻辑
+
+3. **ArceOS 集成层** - `arceos.bbclass`
+   - 平台配置、环境变量、musl 适配
+   - ArceOS 特定构建逻辑
+
+4. **特性解析层** - `arceos-features.bbclass`
+   - Cargo features 自动生成
+   - 复刻 Makefile 特性解析逻辑
+
+5. **内核配方层** - `starry_git.bb`
+   - StarryOS 主配方
+   - 整合所有构建类
 
 ### 目录结构
 
@@ -127,34 +131,49 @@ meta-starry/
 │   ├── templateconf.cfg              # 模板配置标记
 │   ├── local.conf.sample             # 本地配置模板
 │   ├── bblayers.conf.sample          # 层配置模板
-│   ├── distro/
-│   │   ├── starryos.conf             # 发行版配置
+│   ├── distro/                       # 发行版配置
+│   │   ├── starryos.conf             # StarryOS 发行版
 │   │   └── include/
 │   │       ├── arceos-defaults.inc   # ArceOS 默认值
 │   │       └── tclibc-none.inc       # Bare-metal C 库
 │   └── machine/                      # 机器配置
-│       ├── aarch64-qemu-virt.conf
-│       ├── riscv64-qemu-virt.conf
-│       ├── loongarch64-qemu-virt.conf
-│       └── x86_64-qemu-q35.conf
+│       ├── include/
+│       │   └── arceos-machine-common.inc  # 机器配置公共部分
+│       ├── aarch64-qemu-virt.conf    # ARM64 QEMU
+│       ├── aarch64-raspi.conf        # ARM64 Raspberry Pi
+│       ├── riscv64-qemu-virt.conf    # RISC-V 64 QEMU
+│       ├── loongarch64-qemu-virt.conf # LoongArch 64 QEMU
+│       └── x86_64-qemu-q35.conf      # x86_64 QEMU
 │
 ├── recipes-devtools/                 # 开发工具
 │   ├── rust/
-│   │   └── rust-prebuilt-native_1.94.0.bb  # 预编译工具链
+│   │   ├── rust-prebuilt-native_1.94.0.bb  # 预编译工具链
+│   │   └── README-rust.md            # Rust 工具链说明
 │   ├── axconfig-gen/                 # 平台配置生成器
 │   ├── cargo-binutils/               # Rust 二进制工具
 │   └── flex/                         # Flex 依赖修复
 │
 ├── recipes-kernel/                   # 内核配方
 │   └── starryos/
+│       ├── files/                    # 补丁文件
+│       │   └── 0001-use-stable-rust-toolchain.patch
 │       ├── starry_git.bb             # StarryOS 主配方
 │       └── starry-targets.inc        # 多目标配置
+│
+├── recipes-extended/                 # 扩展配方
+│   └── xz/                           # xz 工具修复
+│
+├── recipes-support/                  # 支持配方
+│   └── attr/                         # attr 工具修复
 │
 ├── files/                            # 辅助文件
 │   └── musl-headers/                 # musl 头文件（lwext4 使用）
 │
+├── lib/                              # Python 库
+│   └── crate.py                      # Crate 解析工具
+│
 ├── docs/                             # 文档
-│   
+│   └── learn.md                      # 学习文档
 │
 ├── setup-layers                      # 环境设置脚本
 ├── setup-layers.json                 # 依赖层配置
