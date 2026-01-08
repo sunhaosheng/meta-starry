@@ -77,6 +77,11 @@ TEMPLATECONF=meta-starry/conf source poky/oe-init-build-env build
 
 如果你已经初始化过 build 目录，需要删除旧的配置后再重新初始化（否则脚本不会覆盖现有的 `local.conf`/`bblayers.conf`）。
 
+同时需要记得时不时更新poky仓库
+cd poky
+git pull origin kirkstone 
+
+
 ### 4. 构建 StarryOS 内核
 
 ```bash
