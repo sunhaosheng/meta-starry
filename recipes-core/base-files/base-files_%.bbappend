@@ -1,9 +1,8 @@
-# StarryOS base-files 定制
-#
-# 使用方法：
-#   取消注释下面的行以自定义 hostname
+# base-files_%.bbappend
+# StarryOS 基础文件定制
 
-# 方法 1：固定 hostname（推荐用于测试环境）
+# ==================== Hostname 配置 ====================
+# 方法 1：固定 hostname（用于测试环境）
 # hostname = "starryos-dev"
 
 # 方法 2：根据 MACHINE 动态设置
@@ -13,7 +12,5 @@
 # hostname = ""
 
 # 注意：
-# - 如果在 local.conf 或 distro.conf 中已设置 hostname:pn-base-files，
-#   那里的设置会覆盖这里的值
+# - local.conf 或 distro.conf 中的设置会覆盖这里的值
 # - 当前 meta-starry/conf/distro/starryos.conf 已设置默认值为 "starryos"
-
