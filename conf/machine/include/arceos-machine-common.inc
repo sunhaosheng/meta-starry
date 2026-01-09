@@ -11,16 +11,6 @@ PREFERRED_PROVIDER_virtual/kernel = ""
 # 内核镜像类型为二进制
 KERNEL_IMAGETYPE = "bin"
 
-# ==================== C 库配置 ====================
-# 裸机无 libc
-TCLIBC = "baremetal"
-
-# ==================== 包管理 ====================
-# 裸机不需要包管理
-PACKAGE_CLASSES = "package_ipk"
-INHIBIT_PACKAGE_INSTALL = "1"
-INHIBIT_PACKAGE_STRIP = "1"
-
 # ==================== QEMU 通用配置 ====================
 # 无图形界面
 QB_OPT_APPEND = "-nographic"

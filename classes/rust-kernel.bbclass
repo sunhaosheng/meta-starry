@@ -134,18 +134,18 @@ rust_kernel_setup_toolchain() {
         bbnote "All target libraries included in prebuilt toolchain"
     else
         # 从源码编译的 rust-native: 需要链接 rust-std
-        local target_rustlib="${rust_native}/usr/lib/rustlib/${RUST_TARGET}"
-        local kernel_arch="${KERNEL_ARCH:-${TARGET_ARCH}}"
-        local std_src="${COMPONENTS_DIR}/${BUILD_ARCH}/rust-std-${kernel_arch}-none-native/usr/lib/rustlib/${RUST_TARGET}"
-        
-        if [ ! -d "${target_rustlib}" ]; then
-            if [ ! -d "${std_src}" ]; then
-                bbfatal "Target ${RUST_TARGET} std library not found at ${std_src}"
-            fi
-            bbnote "Linking ${RUST_TARGET} std library into rust-native sysroot"
-            ln -sf "${std_src}" "${target_rustlib}"
+    local target_rustlib="${rust_native}/usr/lib/rustlib/${RUST_TARGET}"
+    local kernel_arch="${KERNEL_ARCH:-${TARGET_ARCH}}"
+    local std_src="${COMPONENTS_DIR}/${BUILD_ARCH}/rust-std-${kernel_arch}-none-native/usr/lib/rustlib/${RUST_TARGET}"
+    
+    if [ ! -d "${target_rustlib}" ]; then
+        if [ ! -d "${std_src}" ]; then
+            bbfatal "Target ${RUST_TARGET} std library not found at ${std_src}"
         fi
-        
+        bbnote "Linking ${RUST_TARGET} std library into rust-native sysroot"
+        ln -sf "${std_src}" "${target_rustlib}"
+    fi
+    
         bbnote "Using rust-native (built from source)"
     fi
     

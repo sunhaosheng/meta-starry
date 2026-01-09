@@ -128,17 +128,17 @@ arceos_generate_config() {
     fi
     
     bbnote "Generating .axconfig.toml (replicating make defconfig)..."
-    
+        
     # 确定 defconfig 路径
     local defconfig="${ARCEOS_DEFCONFIG}"
     if [ -z "${defconfig}" ]; then
         defconfig="${S}/arceos/configs/defconfig.toml"
     fi
-    
+        
     if [ ! -f "${defconfig}" ]; then
         bbfatal "defconfig not found: ${defconfig}"
-    fi
-    
+        fi
+        
     # ==================== 查找平台配置文件 ====================
     # 复刻 platform.mk 的 resolve_config 逻辑
     local plat_config=""
@@ -153,8 +153,8 @@ arceos_generate_config() {
     
     if [ -z "${plat_config}" ] || [ ! -f "${plat_config}" ]; then
         bbfatal "Platform config not found for ${ARCEOS_PLAT_PACKAGE}"
-    fi
-    
+        fi
+        
     bbnote "Configuration sources:"
     bbnote "  defconfig: ${defconfig}"
     bbnote "  platform:  ${plat_config}"
@@ -162,7 +162,7 @@ arceos_generate_config() {
     # ==================== 构建 axconfig-gen 参数 ====================
     # 复刻 config.mk:3-7
     local config_args="${defconfig} ${plat_config}"
-    
+        
     # 添加额外配置文件
     if [ -n "${ARCEOS_EXTRA_CONFIG}" ] && [ -f "${ARCEOS_EXTRA_CONFIG}" ]; then
         config_args="${config_args} ${ARCEOS_EXTRA_CONFIG}"
@@ -175,7 +175,7 @@ arceos_generate_config() {
     
     # ==================== 内存大小覆盖 ====================
     # 复刻 config.mk:9-12
-    if [ -n "${ARCEOS_MEM}" ]; then
+        if [ -n "${ARCEOS_MEM}" ]; then
         # 使用 Python 转换内存大小
         local mem_bytes=$(python3 -c "
 import re
@@ -197,7 +197,7 @@ if match:
     bbnote "Running: axconfig-gen ${config_args} -o ${config_file}"
     eval axconfig-gen ${config_args} -o "${config_file}" || \
         bbfatal "axconfig-gen failed"
-    
+
     # ==================== SMP 覆盖 ====================
     # 复刻 config.mk 中 SMP 的处理 (生成后修改)
     if [ -n "${ARCEOS_SMP}" ]; then
@@ -217,7 +217,7 @@ if match:
     head -30 "${config_file}"
     bbnote "... (truncated)"
 }
-
+    
 # ==================== lwext4_rust musl 工具链适配 ====================
 arceos_setup_musl_wrapper() {
     # lwext4_rust 的 build.rs 期望 ${ARCH}-linux-musl-gcc 工具链
