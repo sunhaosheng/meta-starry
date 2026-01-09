@@ -25,8 +25,8 @@ inherit arceos
 
 # ==================== Feature 解析 Python 函数 ====================
 
-python arceos_resolve_features() {
-    """    
+def arceos_resolve_features(d):
+    """
     features.mk 逻辑摘要:
     1. 根据 APP_TYPE 和 NO_AXSTD 确定 ax_feat_prefix (axfeat/ 或 axstd/)
     2. lib_feat_prefix = AX_LIB/
@@ -151,22 +151,19 @@ python arceos_resolve_features() {
     for f in sorted(app_features):
         final_features.append(f)
     
-    # ==================== 设置输出变量 ====================
+    # ==================== 返回最终特性字符串 ====================
     cargo_features = ' '.join(final_features)
-    d.setVar('CARGO_FEATURES', cargo_features)
     
     bb.note(f"arceos_resolve_features: Output:")
     bb.note(f"  ax_feat (raw): {sorted(ax_feat)}")
     bb.note(f"  lib_feat (raw): {sorted(lib_feat)}")
     bb.note(f"  app_features (raw): {sorted(app_features)}")
     bb.note(f"  CARGO_FEATURES={cargo_features}")
-}
+    return cargo_features
 
-# ==================== 在配方解析时执行 Feature 解析 ====================
-python __anonymous() {
-    # 调用 feature 解析函数
-    bb.build.exec_func('arceos_resolve_features', d)
-}
+# ==================== 由变量展开触发解析 ====================
+# 采用纯函数返回，避免解析期副作用导致 basehash 不稳定
+CARGO_FEATURES = "${@arceos_resolve_features(d)}"
 
 # ==================== 辅助函数：打印 Feature 映射关系 ====================
 python arceos_print_feature_mapping() {
@@ -187,4 +184,3 @@ python arceos_print_feature_mapping() {
     bb.note(f"Final CARGO_FEATURES = {d.getVar('CARGO_FEATURES')}")
     bb.note("=" * 60)
 }
-

@@ -297,6 +297,25 @@ do_compile() {
     export AX_LOG="${ARCEOS_LOG}"
     export AX_TARGET="${RUST_TARGET}"
     export RUST_BACKTRACE=1
+
+    # Host tools for Rust build scripts
+    if [ -z "${BUILD_CC}" ]; then
+        export CC="gcc"
+        export CXX="g++"
+        export AR="ar"
+    else
+        export CC="${BUILD_CC}"
+        export CXX="${BUILD_CXX}"
+        export AR="${BUILD_AR}"
+    fi
+
+    # Rust build scripts invoke "cc" directly; provide a stable shim to gcc.
+    if ! command -v cc >/dev/null 2>&1; then
+        local hosttools_cc="${WORKDIR}/hosttools/cc"
+        mkdir -p "$(dirname "${hosttools_cc}")"
+        ln -sf "$(command -v gcc)" "${hosttools_cc}"
+        export PATH="$(dirname "${hosttools_cc}"):${PATH}"
+    fi
     
     # ==================== musl 工具链适配 ====================
     arceos_setup_musl_wrapper
