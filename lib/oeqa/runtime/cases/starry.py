@@ -248,7 +248,7 @@ class StarryDailyTest(OERuntimeTestCase):
         # Run UnixBench (original Run script)
         # Use a subset of tests to avoid timeout
         status, output = self.target.run(
-            'cd /usr/share/unixbench && ./Run -q -c 1 2>&1',
+            'cd /usr/share/unixbench && ./Run execl',
             timeout=7200
         )
         

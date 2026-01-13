@@ -39,6 +39,15 @@ TEST_SUITES = "starry"
 TEST_QEMUBOOT_TIMEOUT = "300"       
 TEST_OVERALL_TIMEOUT = "3600"
 
+# ==================== OEQA 启动提示匹配 ====================
+# StarryOS 自动进入 shell，没有 login: 提示，需覆盖默认登录匹配规则
+TESTIMAGE_BOOT_PATTERNS = "search_reached_prompt send_login_user search_login_succeeded search_cmd_finished"
+TESTIMAGE_BOOT_PATTERNS[search_reached_prompt] = "root@starry:~#"
+TESTIMAGE_BOOT_PATTERNS[send_login_user] = ""
+TESTIMAGE_BOOT_PATTERNS[search_login_succeeded] = "root@starry:~#"
+TESTIMAGE_BOOT_PATTERNS[search_cmd_finished] = "root@starry:~#"
+
+
 # 使用 slirp 网络（StarryOS 内部仍需网络栈）
 TEST_RUNQEMUPARAMS = "nographic slirp"
 
