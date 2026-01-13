@@ -8,7 +8,7 @@ from oeqa.runtime.decorator.package import OEHasPackage
 
 class UnixBenchTest(OERuntimeTestCase):
     """StarryOS UnixBench benchmark test suite"""
-    
+
     @OEHasPackage(['unixbench'])
     def test_unixbench(self):
         """Run UnixBench system benchmark
@@ -23,12 +23,8 @@ class UnixBenchTest(OERuntimeTestCase):
         if status != 0:
             self.skipTest(f"UnixBench directory or Run script not found")
         
-        # Run UnixBench with execl test only (faster for testing)
-        # Use original Run script instead of wrapper
-        status, output = self.target.run(
-            'cd /usr/share/unixbench && ./Run execl 2>&1',
-            timeout=1800
-        )
+        # Check current directory and run test
+        status, output = self.target.run('cd /usr/share/unixbench && ./Run execl', timeout=500)
         
         self.logger.info(f"UnixBench status={status}, output length={len(output)}")
         self.logger.info(f"UnixBench output:\n{output}")
@@ -48,4 +44,3 @@ class UnixBenchTest(OERuntimeTestCase):
         # Unexpected failure
         else:
             self.fail(f"UnixBench failed (status={status}):\n{output}")
-
